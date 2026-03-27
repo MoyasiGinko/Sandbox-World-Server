@@ -1,0 +1,31 @@
+{% extends "portal/base.html" %}
+{% block title %}Users APIs | Sandbox API Portal{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Users APIs</h1>
+    <p>Authenticated profile actions for the current account.</p>
+</section>
+
+<section class="card">
+    <h2>Update Display Name</h2>
+    <div class="stack">
+        <div><label>Bearer Token</label><textarea id="users-token" placeholder="Paste token from auth page"></textarea></div>
+        <div><label>New Display Name</label><input id="display-name" value="Portal Explorer" /></div>
+        <button onclick="callApi({method:'PUT', path:'/api/users/display-name', token:document.getElementById('users-token').value.trim(), body:{display_name:document.getElementById('display-name').value}, target:'users-result'})">PUT /api/users/display-name</button>
+        <div id="users-result" class="result">No request yet.</div>
+    </div>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Endpoints</h2>
+    {% for endpoint in api_list %}
+        <div class="endpoint">
+            <span class="method m-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+            <div>
+                <div class="mono">{{ endpoint.path }}</div>
+                <div class="hint">{{ endpoint.description }}</div>
+            </div>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "portal/base.html" %}
+{% block title %}Config API | Sandbox API Portal{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Runtime Config API</h1>
+    <p>Fetch the dynamic client configuration payload currently served to the game client.</p>
+</section>
+
+<section class="card">
+    <h2>Client Config</h2>
+    <div class="stack">
+        <button onclick="callApi({method:'GET', path:'/api/client-config/', target:'config-result'})">GET /api/client-config/</button>
+        <div id="config-result" class="result">No request yet.</div>
+    </div>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Endpoints</h2>
+    {% for endpoint in api_list %}
+        <div class="endpoint">
+            <span class="method m-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+            <div>
+                <div class="mono">{{ endpoint.path }}</div>
+                <div class="hint">{{ endpoint.description }}</div>
+            </div>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

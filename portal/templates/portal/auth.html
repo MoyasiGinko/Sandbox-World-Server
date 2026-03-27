@@ -1,0 +1,48 @@
+{% extends "portal/base.html" %}
+{% block title %}Auth APIs | Sandbox API Portal{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Auth APIs</h1>
+    <p>Create users, log in, and verify JWT tokens. Save your token and reuse it on other pages.</p>
+</section>
+
+<section class="split">
+    <article class="card">
+        <h2>Register</h2>
+        <div class="stack">
+            <div><label>Username</label><input id="reg-username" value="portal_user" /></div>
+            <div><label>Email</label><input id="reg-email" value="portal_user@example.com" /></div>
+            <div><label>Password</label><input id="reg-password" type="password" value="StrongPass123!" /></div>
+            <button onclick="callApi({method:'POST', path:'/api/auth/register', body:{username:document.getElementById('reg-username').value,email:document.getElementById('reg-email').value,password:document.getElementById('reg-password').value}, target:'reg-result'})">POST /api/auth/register</button>
+            <div id="reg-result" class="result">No request yet.</div>
+        </div>
+    </article>
+
+    <article class="card">
+        <h2>Login + Verify</h2>
+        <div class="stack">
+            <div><label>Username or Email</label><input id="login-username" value="portal_user" /></div>
+            <div><label>Password</label><input id="login-password" type="password" value="StrongPass123!" /></div>
+            <button onclick="callApi({method:'POST', path:'/api/auth/login', body:{username:document.getElementById('login-username').value,password:document.getElementById('login-password').value}, target:'login-result'})">POST /api/auth/login</button>
+            <div id="login-result" class="result">No request yet.</div>
+
+            <div><label>Bearer Token</label><textarea id="verify-token" placeholder="Paste token here"></textarea></div>
+            <button onclick="callApi({method:'GET', path:'/api/auth/verify', token:document.getElementById('verify-token').value.trim(), target:'verify-result'})">GET /api/auth/verify</button>
+            <div id="verify-result" class="result">No request yet.</div>
+        </div>
+    </article>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Endpoints</h2>
+    {% for endpoint in api_list %}
+        <div class="endpoint">
+            <span class="method m-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+            <div>
+                <div class="mono">{{ endpoint.path }}</div>
+                <div class="hint">{{ endpoint.description }}</div>
+            </div>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

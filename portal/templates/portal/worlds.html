@@ -1,0 +1,58 @@
+{% extends "portal/base.html" %}
+{% block title %}Worlds APIs | Sandbox API Portal{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Worlds APIs</h1>
+    <p>Manage world publishing lifecycle: list, create, inspect, update, report, and delete.</p>
+</section>
+
+<section class="split">
+    <article class="card">
+        <h2>List and Query</h2>
+        <div class="stack">
+            <button onclick="callApi({method:'GET', path:'/api/worlds/', target:'worlds-list'})">GET /api/worlds/</button>
+            <div id="worlds-list" class="result">No request yet.</div>
+
+            <div><label>World ID</label><input id="world-id" placeholder="e.g. 1" /></div>
+            <button onclick="callApi({method:'GET', path:'/api/worlds', query:`id=${encodeURIComponent(document.getElementById('world-id').value)}`, target:'worlds-by-id'})">GET /api/worlds?id=</button>
+            <div id="worlds-by-id" class="result">No request yet.</div>
+
+            <button onclick="callApi({method:'GET', path:'/api/worlds', query:`report=${encodeURIComponent(document.getElementById('world-id').value)}`, target:'worlds-report'})">GET /api/worlds?report=</button>
+            <div id="worlds-report" class="result">No request yet.</div>
+        </div>
+    </article>
+
+    <article class="card">
+        <h2>Create and Update</h2>
+        <div class="stack">
+            <div><label>Name</label><input id="world-name" value="Portal World" /></div>
+            <div><label>TBW</label><textarea id="world-tbw">author;portal
+version;1
+image;none
+</textarea></div>
+            <button onclick="callApi({method:'POST', path:'/api/worlds', body:{name:document.getElementById('world-name').value,tbw:document.getElementById('world-tbw').value}, target:'worlds-create'})">POST /api/worlds</button>
+            <div id="worlds-create" class="result">No request yet.</div>
+
+            <div><label>New Name (for update)</label><input id="world-new-name" value="Portal World Updated" /></div>
+            <button onclick="callApi({method:'PUT', path:'/api/worlds', query:`id=${encodeURIComponent(document.getElementById('world-id').value)}`, body:{name:document.getElementById('world-new-name').value}, target:'worlds-update'})">PUT /api/worlds?id=</button>
+            <div id="worlds-update" class="result">No request yet.</div>
+
+            <button onclick="callApi({method:'DELETE', path:'/api/worlds', query:`id=${encodeURIComponent(document.getElementById('world-id').value)}`, target:'worlds-delete'})">DELETE /api/worlds?id=</button>
+            <div id="worlds-delete" class="result">No request yet.</div>
+        </div>
+    </article>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Endpoints</h2>
+    {% for endpoint in api_list %}
+        <div class="endpoint">
+            <span class="method m-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+            <div>
+                <div class="mono">{{ endpoint.path }}</div>
+                <div class="hint">{{ endpoint.description }}</div>
+            </div>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

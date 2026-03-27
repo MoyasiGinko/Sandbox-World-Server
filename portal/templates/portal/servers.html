@@ -1,0 +1,46 @@
+{% extends "portal/base.html" %}
+{% block title %}Servers APIs | Sandbox API Portal{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Servers APIs</h1>
+    <p>Inspect active servers, register a server identity, and emit heartbeat updates.</p>
+</section>
+
+<section class="split">
+    <article class="card">
+        <h2>List Servers</h2>
+        <div class="stack">
+            <button onclick="callApi({method:'GET', path:'/api/game-servers/', target:'servers-list'})">GET /api/game-servers/</button>
+            <div id="servers-list" class="result">No request yet.</div>
+        </div>
+    </article>
+
+    <article class="card">
+        <h2>Register + Heartbeat</h2>
+        <div class="stack">
+            <div><label>Server ID</label><input id="server-id" value="portal-server-1" /></div>
+            <div><label>Name</label><input id="server-name" value="Portal Server" /></div>
+            <div><label>API URL</label><input id="server-api" value="http://127.0.0.1:30820/api" /></div>
+            <div><label>WS URL</label><input id="server-ws" value="ws://127.0.0.1:30820" /></div>
+            <button onclick="callApi({method:'POST', path:'/api/game-servers', body:{id:document.getElementById('server-id').value,name:document.getElementById('server-name').value,api_url:document.getElementById('server-api').value,ws_url:document.getElementById('server-ws').value}, target:'servers-register'})">POST /api/game-servers</button>
+            <div id="servers-register" class="result">No request yet.</div>
+
+            <button onclick="callApi({method:'POST', path:`/api/game-servers/${encodeURIComponent(document.getElementById('server-id').value)}/heartbeat`, body:{current_players:2,max_players:16,is_active:true}, target:'servers-heartbeat'})">POST /api/game-servers/&lt;id&gt;/heartbeat</button>
+            <div id="servers-heartbeat" class="result">No request yet.</div>
+        </div>
+    </article>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Endpoints</h2>
+    {% for endpoint in api_list %}
+        <div class="endpoint">
+            <span class="method m-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+            <div>
+                <div class="mono">{{ endpoint.path }}</div>
+                <div class="hint">{{ endpoint.description }}</div>
+            </div>
+        </div>
+    {% endfor %}
+</section>
+{% endblock %}

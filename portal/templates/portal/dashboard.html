@@ -1,0 +1,44 @@
+{% extends "portal/base.html" %}
+{% block title %}Dashboard | Sandbox API Portal{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Everything In One Place</h1>
+    <p>Use this portal to navigate every Django API concern and run test calls without leaving the browser. Each section is grouped by responsibility so auth, users, worlds, servers, and runtime config are easy to inspect.</p>
+</section>
+
+<section class="split">
+    <article class="card">
+        <h2>Quick Health Check</h2>
+        <p class="hint">Pings representative endpoints and shows latest status.</p>
+        <div class="stack" style="margin-top: 10px;">
+            <button onclick="callApi({method:'GET', path:'/api/worlds/', target:'health-worlds'})">Check /api/worlds/</button>
+            <div id="health-worlds" class="result">No request yet.</div>
+            <button onclick="callApi({method:'GET', path:'/api/client-config/', target:'health-config'})">Check /api/client-config/</button>
+            <div id="health-config" class="result">No request yet.</div>
+            <button onclick="callApi({method:'GET', path:'/api/game-servers/', target:'health-servers'})">Check /api/game-servers/</button>
+            <div id="health-servers" class="result">No request yet.</div>
+        </div>
+    </article>
+
+    <article class="card">
+        <h2>API Directory</h2>
+        <p class="hint">Method + route index for all groups.</p>
+        <div class="grid" style="margin-top: 10px;">
+            {% for group, endpoints in api_groups.items %}
+                <div>
+                    <h3 style="text-transform: uppercase; letter-spacing: 0.04em;">{{ group }}</h3>
+                    {% for endpoint in endpoints %}
+                        <div class="endpoint">
+                            <span class="method m-{{ endpoint.method|lower }}">{{ endpoint.method }}</span>
+                            <div>
+                                <div class="mono">{{ endpoint.path }}</div>
+                                <div class="hint">{{ endpoint.description }}</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}
