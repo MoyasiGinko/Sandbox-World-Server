@@ -1,17 +1,64 @@
 import json
 import logging
+import os
+from datetime import UTC, datetime, timedelta
+
+import jwt
+from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .models import World
+from .models import GameServer, World
 
 
 logger = logging.getLogger(__name__)
+JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-key-change-in-production")
+JWT_EXPIRATION_DAYS = 7
 
 
 def _json_error(message: str, status: int = 400) -> JsonResponse:
 	return JsonResponse({"error": message}, status=status)
+
+
+def _get_bearer_token(request: HttpRequest) -> str | None:
+	auth_header = request.headers.get("Authorization", "")
+	if not auth_header.startswith("Bearer "):
+		return None
+	return auth_header.split(" ", 1)[1].strip()
+
+
+def _decode_access_token(token: str) -> dict | None:
+	try:
+		decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+		if isinstance(decoded, dict):
+			return decoded
+	except Exception:
+		return None
+	return None
+
+
+def _build_access_token(user: User) -> str:
+	display_name = user.first_name.strip() if user.first_name else user.username
+	payload = {
+		"userId": user.id,
+		"username": user.username,
+		"display_name": display_name,
+		"exp": datetime.now(UTC) + timedelta(days=JWT_EXPIRATION_DAYS),
+	}
+	return str(jwt.encode(payload, JWT_SECRET, algorithm="HS256"))
+
+
+def _serialize_user(user: User) -> dict:
+	display_name = user.first_name.strip() if user.first_name else user.username
+	return {
+		"id": user.id,
+		"username": user.username,
+		"email": user.email,
+		"display_name": display_name,
+	}
 
 
 def _parse_request_body(request: HttpRequest) -> dict:
@@ -132,5 +179,164 @@ def worlds_api(request: HttpRequest) -> HttpResponse:
 		return HttpResponse("OK")
 
 	return _json_error("method not allowed", status=405)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def game_servers_api(request: HttpRequest) -> HttpResponse:
+	if request.method == "GET":
+		public_only = request.GET.get("public", "true").lower() != "false"
+		queryset = GameServer.objects.filter(is_active=True)
+		if public_only:
+			queryset = queryset.filter(is_public=True)
+		servers = [server.to_public_dict() for server in queryset]
+		return JsonResponse({"success": True, "servers": servers})
+
+	data = _parse_request_body(request)
+	required = ["id", "name", "api_url", "ws_url"]
+	missing = [field for field in required if not data.get(field)]
+	if missing:
+		return _json_error("missing fields: " + ", ".join(missing))
+
+	server, _created = GameServer.objects.update_or_create(
+		server_id=str(data.get("id")),
+		defaults={
+			"name": str(data.get("name")),
+			"region": str(data.get("region") or "global"),
+			"api_url": str(data.get("api_url")),
+			"ws_url": str(data.get("ws_url")),
+			"is_public": bool(data.get("is_public", True)),
+			"is_active": bool(data.get("is_active", True)),
+			"current_players": int(data.get("current_players", 0) or 0),
+			"max_players": int(data.get("max_players", 64) or 64),
+			"build_version": str(data.get("build_version") or ""),
+		},
+	)
+	return JsonResponse({"success": True, "server": server.to_public_dict()})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def game_server_heartbeat_api(request: HttpRequest, server_id: str) -> HttpResponse:
+	data = _parse_request_body(request)
+	try:
+		server = GameServer.objects.get(server_id=server_id)
+	except GameServer.DoesNotExist:
+		return _json_error("server not found", status=404)
+
+	if "current_players" in data:
+		server.current_players = int(data.get("current_players", 0) or 0)
+	if "max_players" in data:
+		server.max_players = int(data.get("max_players", server.max_players) or server.max_players)
+	if "is_active" in data:
+		server.is_active = bool(data.get("is_active", True))
+
+	server.last_heartbeat = timezone.now()
+	server.save()
+	return JsonResponse({"success": True, "server": server.to_public_dict()})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def auth_register_api(request: HttpRequest) -> HttpResponse:
+	data = _parse_request_body(request)
+	username = str(data.get("username", "")).strip()
+	email = str(data.get("email", "")).strip().lower()
+	password = str(data.get("password", ""))
+
+	if len(username) < 3 or len(username) > 20:
+		return _json_error("Username must be 3-20 characters", status=400)
+	if not username.replace("_", "a").isalnum():
+		return _json_error("Username format is invalid", status=400)
+	if "@" not in email or "." not in email:
+		return _json_error("Email format is invalid", status=400)
+	if len(password) < 8:
+		return _json_error("Password must be at least 8 characters", status=400)
+
+	if User.objects.filter(username=username).exists():
+		return _json_error("Username already taken", status=409)
+	if User.objects.filter(email=email).exists():
+		return _json_error("Email already registered", status=409)
+
+	user = User.objects.create(
+		username=username,
+		email=email,
+		password=make_password(password),
+		first_name=username,
+	)
+	token = _build_access_token(user)
+
+	return JsonResponse({"token": token, "user": _serialize_user(user)}, status=201)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def auth_login_api(request: HttpRequest) -> HttpResponse:
+	data = _parse_request_body(request)
+	login_id = str(data.get("username", "")).strip()
+	password = str(data.get("password", ""))
+
+	if login_id == "" or password == "":
+		return _json_error("Invalid credentials", status=401)
+
+	user = User.objects.filter(username=login_id).first()
+	if user is None:
+		user = User.objects.filter(email=login_id.lower()).first()
+	if user is None:
+		return _json_error("Invalid credentials", status=401)
+
+	if not check_password(password, user.password):
+		return _json_error("Invalid credentials", status=401)
+
+	user.last_login = timezone.now()
+	user.save(update_fields=["last_login"])
+
+	token = _build_access_token(user)
+	return JsonResponse({"token": token, "user": _serialize_user(user)})
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def auth_verify_api(request: HttpRequest) -> HttpResponse:
+	token = _get_bearer_token(request)
+	if token is None:
+		return JsonResponse({"valid": False, "error": "No token provided"}, status=401)
+
+	decoded = _decode_access_token(token)
+	if decoded is None:
+		return JsonResponse({"valid": False, "error": "Invalid token"}, status=403)
+
+	user_id = int(decoded.get("userId", 0) or 0)
+	user = User.objects.filter(id=user_id).first()
+	if user is None:
+		return JsonResponse({"valid": False, "error": "User not found"}, status=404)
+
+	return JsonResponse({"valid": True, "user": _serialize_user(user)})
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_display_name_api(request: HttpRequest) -> HttpResponse:
+	token = _get_bearer_token(request)
+	if token is None:
+		return _json_error("Authentication required", status=401)
+
+	decoded = _decode_access_token(token)
+	if decoded is None:
+		return _json_error("Invalid token", status=403)
+
+	user_id = int(decoded.get("userId", 0) or 0)
+	user = User.objects.filter(id=user_id).first()
+	if user is None:
+		return _json_error("User not found", status=404)
+
+	data = _parse_request_body(request)
+	display_name = str(data.get("display_name", "")).strip()
+	if display_name == "" or len(display_name) > 30:
+		return _json_error("Display name must be 1-30 characters", status=400)
+
+	user.first_name = display_name
+	user.save(update_fields=["first_name"])
+	return JsonResponse({"success": True, "user": _serialize_user(user)})
 
 # Create your views here.
