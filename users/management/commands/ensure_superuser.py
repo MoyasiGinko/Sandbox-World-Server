@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = "Create a superuser from DJANGO_SUPERUSER_* env vars if missing."
+    help = "Ensure a deploy-time superuser from DJANGO_SUPERUSER_* env vars exists and is usable."
 
     def handle(self, *args, **options):
         username = (os.getenv("DJANGO_SUPERUSER_USERNAME") or "").strip()
@@ -21,13 +21,22 @@ class Command(BaseCommand):
             return
 
         user_model = get_user_model()
-        if user_model.objects.filter(username=username).exists():
-            self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' already exists"))
-            return
-
-        user_model.objects.create_superuser(
+        user, created = user_model.objects.get_or_create(
             username=username,
-            email=email,
-            password=password,
+            defaults={
+                "email": email,
+            },
         )
-        self.stdout.write(self.style.SUCCESS(f"Created superuser '{username}'"))
+
+        # Always enforce a deploy-known login state for the configured admin user.
+        user.email = email
+        user.is_staff = True
+        user.is_superuser = True
+        user.is_active = True
+        user.set_password(password)
+        user.save(update_fields=["email", "is_staff", "is_superuser", "is_active", "password"])
+
+        if created:
+            self.stdout.write(self.style.SUCCESS(f"Created superuser '{username}'"))
+        else:
+            self.stdout.write(self.style.SUCCESS(f"Updated superuser '{username}' credentials and flags"))
