@@ -57,6 +57,34 @@ def _env_list(key: str, default: list[str]) -> list[str]:
 _load_dotenv(BASE_DIR / ".env")
 
 
+def _resolve_sqlite_db_path() -> str:
+    configured = os.getenv("DJANGO_DB_PATH", "db.sqlite3").strip()
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        candidate = BASE_DIR / candidate
+
+    parent = candidate.parent
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+
+    parent_writable = os.access(parent, os.W_OK)
+    file_writable = (not candidate.exists()) or os.access(candidate, os.W_OK)
+    if parent_writable and file_writable:
+        return str(candidate)
+
+    fallback = Path(
+        os.getenv("DJANGO_DB_FALLBACK_PATH", "/tmp/worldserver.sqlite3").strip()
+        or "/tmp/worldserver.sqlite3"
+    )
+    try:
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return str(fallback)
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -117,7 +145,7 @@ WSGI_APPLICATION = 'worldserver.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.getenv('DJANGO_DB_PATH', str(BASE_DIR / 'db.sqlite3')),
+        'NAME': _resolve_sqlite_db_path(),
     }
 }
 
