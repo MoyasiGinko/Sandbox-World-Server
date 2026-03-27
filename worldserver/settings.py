@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -54,6 +55,36 @@ def _env_list(key: str, default: list[str]) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _extract_hostname(value: str) -> str:
+    text = value.strip()
+    if text == "":
+        return ""
+    parsed = urlparse(text if "://" in text else f"http://{text}")
+    return (parsed.hostname or "").strip()
+
+
+def _build_allowed_hosts() -> list[str]:
+    hosts = _env_list(
+        "DJANGO_ALLOWED_HOSTS",
+        ["127.0.0.1", "localhost", ".migetapp.com"],
+    )
+
+    for source in [
+        os.getenv("PUBLIC_DJANGO_BASE_URL", ""),
+        os.getenv("MIGET_APP_URL", ""),
+        os.getenv("MIGET_PUBLIC_URL", ""),
+        os.getenv("MIGET_HOST", ""),
+    ]:
+        hostname = _extract_hostname(source)
+        if hostname and hostname not in hosts:
+            hosts.append(hostname)
+
+    if ".migetapp.com" not in hosts:
+        hosts.append(".migetapp.com")
+
+    return hosts
+
+
 _load_dotenv(BASE_DIR / ".env")
 
 
@@ -94,7 +125,7 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me-in-env-for-production")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_bool("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", ["127.0.0.1", "localhost"])
+ALLOWED_HOSTS = _build_allowed_hosts()
 
 
 # Application definition
@@ -106,6 +137,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'users',
+    'servers',
+    'config',
     'worlds',
 ]
 
