@@ -4,6 +4,7 @@ import os
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -11,12 +12,23 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .models import GameServer, World
+from .models import GameServer, RuntimeConfig, World
 
 
 logger = logging.getLogger(__name__)
-JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-key-change-in-production")
-JWT_EXPIRATION_DAYS = 7
+JWT_SECRET = settings.JWT_SECRET
+JWT_EXPIRATION_DAYS = settings.JWT_EXPIRATION_DAYS
+
+DEFAULT_PUBLIC_CLIENT_CONFIG = {
+	"django_base_url": settings.PUBLIC_DJANGO_BASE_URL,
+	"django_api_base_url": settings.PUBLIC_DJANGO_API_BASE_URL,
+	"node_api_base_url": settings.DEFAULT_NODE_API_BASE_URL,
+	"node_ws_url": settings.DEFAULT_NODE_WS_URL,
+	"world_database_repo": settings.DEFAULT_WORLD_DATABASE_REPO,
+	"legacy_server_list_url": settings.DEFAULT_SERVER_LIST_URL,
+	"update_release_api_url": settings.DEFAULT_UPDATE_RELEASE_API_URL,
+	"update_release_page_url": settings.DEFAULT_UPDATE_RELEASE_PAGE_URL,
+}
 
 
 def _json_error(message: str, status: int = 400) -> JsonResponse:
@@ -92,6 +104,34 @@ def _extract_tbw_metadata(tbw: str) -> dict:
 		if len(meta) == 3:
 			break
 	return meta
+
+
+def _load_runtime_public_config() -> dict[str, str]:
+	values = dict(DEFAULT_PUBLIC_CLIENT_CONFIG)
+	for row in RuntimeConfig.objects.filter(is_public=True):
+		values[row.key] = row.value
+	return values
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def client_config_api(request: HttpRequest) -> HttpResponse:
+	config_values = _load_runtime_public_config()
+
+	# If node endpoints are not explicitly set in RuntimeConfig,
+	# derive them from the most recently active public game server.
+	if config_values.get("node_api_base_url", "").strip() == "" or config_values.get("node_ws_url", "").strip() == "":
+		active_server = (
+			GameServer.objects.filter(is_active=True, is_public=True)
+			.order_by("-last_heartbeat")
+			.first()
+		)
+		if active_server is not None:
+			config_values["node_api_base_url"] = active_server.api_url
+			config_values["node_ws_url"] = active_server.ws_url
+			config_values["selected_server_id"] = active_server.server_id
+
+	return JsonResponse({"success": True, "config": config_values})
 
 
 @csrf_exempt

@@ -7,6 +7,9 @@ Minimal Django API implementing the TinyBox Worlds database contract.
 ```bash
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
+
+# create local environment file
+copy .env.example .env
 ```
 
 ## Running
@@ -14,6 +17,12 @@ python -m venv .venv
 ```bash
 ./.venv/Scripts/python.exe manage.py runserver 0.0.0.0:8000
 ```
+
+## Runtime Config Management
+
+- Dynamic client-facing URLs/config are served from `GET /api/client-config`.
+- Values are managed in Django Admin via `RuntimeConfig` records.
+- If a key is not set in the table, the API falls back to values from `.env`.
 
 ## API
 

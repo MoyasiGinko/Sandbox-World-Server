@@ -10,22 +10,63 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv(dotenv_path: Path) -> None:
+    if not dotenv_path.exists():
+        return
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+def _env_bool(key: str, default: bool) -> bool:
+    value = os.getenv(key)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(key: str, default: int) -> int:
+    value = os.getenv(key)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _env_list(key: str, default: list[str]) -> list[str]:
+    value = os.getenv(key)
+    if value is None or value.strip() == "":
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+_load_dotenv(BASE_DIR / ".env")
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#%n^q&psu=l^umr1z(v)hx!mpe*xm=-a2dxub7@u2%pwbu-y@s'
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me-in-env-for-production")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", ["127.0.0.1", "localhost"])
 
 
 # Application definition
@@ -76,9 +117,36 @@ WSGI_APPLICATION = 'worldserver.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.getenv('DJANGO_DB_PATH', str(BASE_DIR / 'db.sqlite3')),
     }
 }
+
+
+# JWT / auth settings used by API views.
+JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-env-for-production")
+JWT_EXPIRATION_DAYS = _env_int("JWT_EXPIRATION_DAYS", 7)
+
+# Public runtime config defaults exposed via /api/client-config.
+PUBLIC_DJANGO_BASE_URL = os.getenv("PUBLIC_DJANGO_BASE_URL", "http://127.0.0.1:8000")
+PUBLIC_DJANGO_API_BASE_URL = os.getenv("PUBLIC_DJANGO_API_BASE_URL", f"{PUBLIC_DJANGO_BASE_URL}/api")
+DEFAULT_NODE_API_BASE_URL = os.getenv("DEFAULT_NODE_API_BASE_URL", "")
+DEFAULT_NODE_WS_URL = os.getenv("DEFAULT_NODE_WS_URL", "")
+DEFAULT_WORLD_DATABASE_REPO = os.getenv(
+    "DEFAULT_WORLD_DATABASE_REPO",
+    "https://tinybox-worlds.caelan-douglas.workers.dev/",
+)
+DEFAULT_SERVER_LIST_URL = os.getenv(
+    "DEFAULT_SERVER_LIST_URL",
+    "https://raw.githubusercontent.com/MoyasiGinko/godot-world-release/refs/heads/main/server_list.json",
+)
+DEFAULT_UPDATE_RELEASE_API_URL = os.getenv(
+    "DEFAULT_UPDATE_RELEASE_API_URL",
+    "https://api.github.com/repos/caelan-douglas/tinybox/releases/latest",
+)
+DEFAULT_UPDATE_RELEASE_PAGE_URL = os.getenv(
+    "DEFAULT_UPDATE_RELEASE_PAGE_URL",
+    "https://github.com/caelan-douglas/tinybox/releases/latest",
+)
 
 
 # Password validation
