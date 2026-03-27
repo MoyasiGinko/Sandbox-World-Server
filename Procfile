@@ -1,2 +1,2 @@
 web: sh -c "python manage.py migrate --noinput && gunicorn worldserver.wsgi:application --bind 0.0.0.0:$PORT"
-release: python manage.py collectstatic --noinput && python manage.py migrate
+release: sh -c "python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py shell -c \"import os; from django.contrib.auth import get_user_model; U=get_user_model(); username=os.getenv('DJANGO_SUPERUSER_USERNAME'); email=os.getenv('DJANGO_SUPERUSER_EMAIL', 'admin@example.com'); password=os.getenv('DJANGO_SUPERUSER_PASSWORD'); username and password and (U.objects.filter(username=username).exists() or U.objects.create_superuser(username=username, email=email, password=password))\""
