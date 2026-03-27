@@ -13,7 +13,7 @@
             <button onclick="callApi({method:'GET', path:'/api/worlds/', target:'worlds-list'})">GET /api/worlds/</button>
             <div id="worlds-list" class="result">No request yet.</div>
 
-            <div><label>World ID</label><input id="world-id" placeholder="e.g. 1" /></div>
+            <div><label>World ID</label><input id="world-id" data-autofill="world-id" placeholder="e.g. 1" /></div>
             <button onclick="callApi({method:'GET', path:'/api/worlds', query:`id=${encodeURIComponent(document.getElementById('world-id').value)}`, target:'worlds-by-id'})">GET /api/worlds?id=</button>
             <div id="worlds-by-id" class="result">No request yet.</div>
 

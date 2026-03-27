@@ -41,4 +41,16 @@
         </div>
     </article>
 </section>
+
+<section class="card" style="margin-top: 14px;">
+    <h2>Portal Activity Log</h2>
+    <p class="hint">Shows recent API requests made from any portal page in this browser.</p>
+    <div class="stack" style="margin-top: 10px;">
+        <div id="activity-log" class="result">No requests captured yet.</div>
+        <div class="split">
+            <button onclick="renderActivityLog()">Refresh Log</button>
+            <button onclick="clearActivityLog()">Clear Log</button>
+        </div>
+    </div>
+</section>
 {% endblock %}

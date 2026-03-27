@@ -64,6 +64,21 @@
             flex-wrap: wrap;
             gap: 8px;
         }
+        .tokenbar {
+            width: 100%;
+            display: grid;
+            gap: 8px;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+        }
+        .tokenbar textarea {
+            min-height: 42px;
+            max-height: 120px;
+        }
+        .pill {
+            border-radius: 999px;
+            padding: 9px 12px;
+        }
         .nav a {
             text-decoration: none;
             color: var(--brand-strong);
@@ -189,22 +204,162 @@
         @media (max-width: 720px) {
             .topbar { border-radius: 14px; }
             .card { border-radius: 14px; }
+            .tokenbar {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
     <script>
+        const TOKEN_KEY = "portal.token";
+        const ACTIVITY_KEY = "portal.activity";
+        const WORLD_ID_KEY = "portal.world_id";
+        const SERVER_ID_KEY = "portal.server_id";
+
+        function parseJsonSafely(raw) {
+            try {
+                return JSON.parse(raw);
+            } catch (_err) {
+                return null;
+            }
+        }
+
+        function getStoredToken() {
+            return localStorage.getItem(TOKEN_KEY) || "";
+        }
+
+        function setStoredToken(token) {
+            if (!token) {
+                return;
+            }
+            localStorage.setItem(TOKEN_KEY, token);
+            syncTokenFields();
+        }
+
+        function clearStoredToken() {
+            localStorage.removeItem(TOKEN_KEY);
+            syncTokenFields();
+        }
+
+        function syncTokenFields() {
+            const token = getStoredToken();
+            document.querySelectorAll("[data-token-field='shared']").forEach((el) => {
+                if (document.activeElement !== el || !el.value.trim()) {
+                    el.value = token;
+                }
+            });
+        }
+
+        function setAutofillValue(storageKey, selector, value) {
+            if (!value) {
+                return;
+            }
+            localStorage.setItem(storageKey, String(value));
+            document.querySelectorAll(selector).forEach((el) => {
+                if (document.activeElement !== el || !el.value.trim()) {
+                    el.value = String(value);
+                }
+            });
+        }
+
+        function syncAutofillFields() {
+            const worldId = localStorage.getItem(WORLD_ID_KEY) || "";
+            const serverId = localStorage.getItem(SERVER_ID_KEY) || "";
+            if (worldId) {
+                document.querySelectorAll("[data-autofill='world-id']").forEach((el) => {
+                    if (!el.value.trim()) {
+                        el.value = worldId;
+                    }
+                });
+            }
+            if (serverId) {
+                document.querySelectorAll("[data-autofill='server-id']").forEach((el) => {
+                    if (!el.value.trim()) {
+                        el.value = serverId;
+                    }
+                });
+            }
+        }
+
+        function collectIds(data) {
+            if (!data || typeof data !== "object") {
+                return;
+            }
+            if (data.token && typeof data.token === "string") {
+                setStoredToken(data.token);
+            }
+
+            if (Array.isArray(data) && data.length > 0 && data[0] && data[0].id) {
+                setAutofillValue(WORLD_ID_KEY, "[data-autofill='world-id']", data[0].id);
+                return;
+            }
+
+            if (data.world && data.world.id) {
+                setAutofillValue(WORLD_ID_KEY, "[data-autofill='world-id']", data.world.id);
+            }
+            if (data.server && data.server.id) {
+                setAutofillValue(SERVER_ID_KEY, "[data-autofill='server-id']", data.server.id);
+            }
+            if (Array.isArray(data.servers) && data.servers.length > 0 && data.servers[0] && data.servers[0].id) {
+                setAutofillValue(SERVER_ID_KEY, "[data-autofill='server-id']", data.servers[0].id);
+            }
+        }
+
+        function readActivity() {
+            const raw = localStorage.getItem(ACTIVITY_KEY);
+            if (!raw) {
+                return [];
+            }
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (_err) {
+                return [];
+            }
+        }
+
+        function pushActivity(entry) {
+            const current = readActivity();
+            current.unshift(entry);
+            localStorage.setItem(ACTIVITY_KEY, JSON.stringify(current.slice(0, 60)));
+            renderActivityLog();
+        }
+
+        function clearActivityLog() {
+            localStorage.removeItem(ACTIVITY_KEY);
+            renderActivityLog();
+        }
+
+        function renderActivityLog() {
+            const el = document.getElementById("activity-log");
+            if (!el) {
+                return;
+            }
+            const data = readActivity();
+            if (!data.length) {
+                el.textContent = "No requests captured yet.";
+                return;
+            }
+            el.textContent = data.map((item) => {
+                return `${item.time} | ${item.method} ${item.path} -> ${item.status}`;
+            }).join("\n");
+        }
+
         async function callApi(opts) {
             const {
                 method,
                 path,
                 body,
                 token,
+                tokenSource,
                 target,
                 query,
             } = opts;
             const targetEl = document.getElementById(target);
             const headers = { "Content-Type": "application/json" };
-            if (token) {
-                headers["Authorization"] = `Bearer ${token}`;
+            const tokenEl = tokenSource ? document.getElementById(tokenSource) : null;
+            const pickedToken = token || (tokenEl ? tokenEl.value.trim() : "") || getStoredToken();
+            if (pickedToken) {
+                headers["Authorization"] = `Bearer ${pickedToken}`;
             }
             const url = query ? `${path}${path.includes("?") ? "&" : "?"}${query}` : path;
             targetEl.textContent = "Loading...";
@@ -216,15 +371,35 @@
                 });
                 const raw = await res.text();
                 let pretty = raw;
+                const parsed = parseJsonSafely(raw);
                 try {
-                    pretty = JSON.stringify(JSON.parse(raw), null, 2);
+                    pretty = JSON.stringify(parsed, null, 2);
                 } catch (_err) {
                 }
+                collectIds(parsed);
+                pushActivity({
+                    time: new Date().toLocaleTimeString(),
+                    method,
+                    path: url,
+                    status: res.status,
+                });
                 targetEl.textContent = `Status: ${res.status}\n\n${pretty}`;
             } catch (err) {
+                pushActivity({
+                    time: new Date().toLocaleTimeString(),
+                    method,
+                    path: url,
+                    status: "ERR",
+                });
                 targetEl.textContent = `Request failed: ${err}`;
             }
         }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            syncTokenFields();
+            syncAutofillFields();
+            renderActivityLog();
+        });
     </script>
 </head>
 <body>
@@ -243,6 +418,11 @@
                 <a href="/portal/api/config/">Config</a>
                 <a href="/admin/">Admin</a>
             </nav>
+            <div class="tokenbar">
+                <textarea id="shared-token" data-token-field="shared" placeholder="Shared Bearer token for all API pages"></textarea>
+                <button class="pill" onclick="setStoredToken(document.getElementById('shared-token').value.trim())">Save Token</button>
+                <button class="pill" onclick="clearStoredToken()">Clear Token</button>
+            </div>
         </header>
         {% block content %}{% endblock %}
     </div>

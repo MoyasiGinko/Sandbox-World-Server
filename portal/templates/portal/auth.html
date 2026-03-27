@@ -26,8 +26,8 @@
             <button onclick="callApi({method:'POST', path:'/api/auth/login', body:{username:document.getElementById('login-username').value,password:document.getElementById('login-password').value}, target:'login-result'})">POST /api/auth/login</button>
             <div id="login-result" class="result">No request yet.</div>
 
-            <div><label>Bearer Token</label><textarea id="verify-token" placeholder="Paste token here"></textarea></div>
-            <button onclick="callApi({method:'GET', path:'/api/auth/verify', token:document.getElementById('verify-token').value.trim(), target:'verify-result'})">GET /api/auth/verify</button>
+            <div><label>Bearer Token</label><textarea id="verify-token" data-token-field="shared" placeholder="Leave blank to use saved shared token"></textarea></div>
+            <button onclick="callApi({method:'GET', path:'/api/auth/verify', tokenSource:'verify-token', target:'verify-result'})">GET /api/auth/verify</button>
             <div id="verify-result" class="result">No request yet.</div>
         </div>
     </article>
