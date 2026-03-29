@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import URLValidator
 
 
 class GameServer(models.Model):
@@ -6,7 +7,9 @@ class GameServer(models.Model):
     name = models.CharField(max_length=255)
     region = models.CharField(max_length=64, default="global")
     api_url = models.URLField()
-    ws_url = models.URLField()
+    ws_url = models.URLField(
+        validators=[URLValidator(schemes=["http", "https", "ws", "wss"])],
+    )
     is_public = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     current_players = models.PositiveIntegerField(default=0)
