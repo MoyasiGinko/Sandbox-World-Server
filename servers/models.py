@@ -40,3 +40,17 @@ class GameServer(models.Model):
             "build_version": self.build_version,
             "last_heartbeat": self.last_heartbeat.isoformat(),
         }
+
+
+class GameServerRoomCapacity(models.Model):
+    server_id = models.CharField(max_length=64, unique=True)
+    max_rooms = models.PositiveIntegerField(default=100)
+    current_rooms = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "servers_room_capacity"
+        ordering = ["server_id"]
+
+    def __str__(self) -> str:
+        return f"{self.server_id}: {self.current_rooms}/{self.max_rooms}"

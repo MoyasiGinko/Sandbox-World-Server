@@ -5,7 +5,21 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from common.helpers import json_error, parse_request_body
-from servers.models import GameServer
+from servers.models import GameServer, GameServerRoomCapacity
+
+
+def _get_or_create_capacity(server_id: str) -> GameServerRoomCapacity:
+    capacity, _ = GameServerRoomCapacity.objects.get_or_create(server_id=server_id)
+    return capacity
+
+
+def _serialize_server(server: GameServer) -> dict:
+    payload = server.to_public_dict()
+    capacity = _get_or_create_capacity(server.server_id)
+    payload["max_rooms"] = capacity.max_rooms
+    payload["current_rooms"] = capacity.current_rooms
+    payload["can_create_room"] = capacity.current_rooms < capacity.max_rooms
+    return payload
 
 
 @csrf_exempt
@@ -17,7 +31,7 @@ def game_servers_api(request: HttpRequest) -> HttpResponse:
             queryset = GameServer.objects.filter(is_active=True)
             if public_only:
                 queryset = queryset.filter(is_public=True)
-            servers = [server.to_public_dict() for server in queryset]
+            servers = [_serialize_server(server) for server in queryset]
             return JsonResponse({"success": True, "servers": servers})
 
         data = parse_request_body(request)
@@ -40,7 +54,15 @@ def game_servers_api(request: HttpRequest) -> HttpResponse:
                 "build_version": str(data.get("build_version") or ""),
             },
         )
-        return JsonResponse({"success": True, "server": server.to_public_dict()})
+
+        capacity = _get_or_create_capacity(server.server_id)
+        if "current_rooms" in data:
+            capacity.current_rooms = int(
+                data.get("current_rooms", capacity.current_rooms) or capacity.current_rooms
+            )
+            capacity.save(update_fields=["current_rooms", "updated_at"])
+
+        return JsonResponse({"success": True, "server": _serialize_server(server)})
     except (OperationalError, ProgrammingError):
         return JsonResponse(
             {
@@ -69,8 +91,16 @@ def game_server_heartbeat_api(request: HttpRequest, server_id: str) -> HttpRespo
             server.is_active = bool(data.get("is_active", True))
 
         server.last_heartbeat = timezone.now()
-        server.save()
-        return JsonResponse({"success": True, "server": server.to_public_dict()})
+        server.save(update_fields=["current_players", "max_players", "is_active", "last_heartbeat"])
+
+        capacity = _get_or_create_capacity(server.server_id)
+        if "current_rooms" in data:
+            capacity.current_rooms = int(
+                data.get("current_rooms", capacity.current_rooms) or capacity.current_rooms
+            )
+            capacity.save(update_fields=["current_rooms", "updated_at"])
+
+        return JsonResponse({"success": True, "server": _serialize_server(server)})
     except (OperationalError, ProgrammingError):
         return JsonResponse(
             {

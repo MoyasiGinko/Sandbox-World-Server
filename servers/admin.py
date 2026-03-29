@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import GameServer
+from .models import GameServer, GameServerRoomCapacity
 
 
 @admin.register(GameServer)
@@ -17,3 +17,9 @@ class GameServerAdmin(admin.ModelAdmin):
     )
     search_fields = ("server_id", "name", "region")
     list_filter = ("is_public", "is_active", "region")
+
+
+@admin.register(GameServerRoomCapacity)
+class GameServerRoomCapacityAdmin(admin.ModelAdmin):
+    list_display = ("server_id", "max_rooms", "current_rooms", "updated_at")
+    search_fields = ("server_id",)
