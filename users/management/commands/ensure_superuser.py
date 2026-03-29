@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         username = (os.getenv("DJANGO_SUPERUSER_USERNAME") or "").strip()
-        email = (os.getenv("DJANGO_SUPERUSER_EMAIL") or "admin@example.com").strip()
+        email = (os.getenv("DJANGO_SUPERUSER_EMAIL") or "").strip()
         password = os.getenv("DJANGO_SUPERUSER_PASSWORD") or ""
 
         if not username or not password:

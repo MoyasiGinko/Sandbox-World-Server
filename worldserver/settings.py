@@ -64,10 +64,7 @@ def _extract_hostname(value: str) -> str:
 
 
 def _build_allowed_hosts() -> list[str]:
-    hosts = _env_list(
-        "DJANGO_ALLOWED_HOSTS",
-        ["127.0.0.1", "localhost", ".migetapp.com"],
-    )
+    hosts = _env_list("DJANGO_ALLOWED_HOSTS", [])
 
     for source in [
         os.getenv("PUBLIC_DJANGO_BASE_URL", ""),
@@ -79,9 +76,6 @@ def _build_allowed_hosts() -> list[str]:
         if hostname and hostname not in hosts:
             hosts.append(hostname)
 
-    if ".migetapp.com" not in hosts:
-        hosts.append(".migetapp.com")
-
     return hosts
 
 
@@ -89,7 +83,7 @@ _load_dotenv(BASE_DIR / ".env")
 
 
 def _resolve_sqlite_db_path() -> str:
-    configured = os.getenv("DJANGO_DB_PATH", "db.sqlite3").strip()
+    configured = (os.getenv("DJANGO_DB_PATH") or "db.sqlite3").strip()
     candidate = Path(configured)
     if not candidate.is_absolute():
         candidate = BASE_DIR / candidate
@@ -106,7 +100,7 @@ def _resolve_sqlite_db_path() -> str:
         return str(candidate)
 
     fallback = Path(
-        os.getenv("DJANGO_DB_FALLBACK_PATH", "/tmp/worldserver.sqlite3").strip()
+        (os.getenv("DJANGO_DB_FALLBACK_PATH") or "/tmp/worldserver.sqlite3").strip()
         or "/tmp/worldserver.sqlite3"
     )
     try:
@@ -120,10 +114,10 @@ def _resolve_sqlite_db_path() -> str:
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me-in-env-for-production")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = _env_bool("DJANGO_DEBUG", True)
+DEBUG = _env_bool("DJANGO_DEBUG", False)
 
 ALLOWED_HOSTS = _build_allowed_hosts()
 
@@ -187,29 +181,29 @@ DATABASES = {
 
 
 # JWT / auth settings used by API views.
-JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-env-for-production")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_EXPIRATION_DAYS = _env_int("JWT_EXPIRATION_DAYS", 7)
 
 # Public runtime config defaults exposed via /api/client-config.
-PUBLIC_DJANGO_BASE_URL = os.getenv("PUBLIC_DJANGO_BASE_URL", "http://127.0.0.1:8000")
+PUBLIC_DJANGO_BASE_URL = os.getenv("PUBLIC_DJANGO_BASE_URL", "")
 PUBLIC_DJANGO_API_BASE_URL = os.getenv("PUBLIC_DJANGO_API_BASE_URL", f"{PUBLIC_DJANGO_BASE_URL}/api")
 DEFAULT_NODE_API_BASE_URL = os.getenv("DEFAULT_NODE_API_BASE_URL", "")
 DEFAULT_NODE_WS_URL = os.getenv("DEFAULT_NODE_WS_URL", "")
 DEFAULT_WORLD_DATABASE_REPO = os.getenv(
     "DEFAULT_WORLD_DATABASE_REPO",
-    "https://tinybox-worlds.caelan-douglas.workers.dev/",
+    "",
 )
 DEFAULT_SERVER_LIST_URL = os.getenv(
     "DEFAULT_SERVER_LIST_URL",
-    "https://raw.githubusercontent.com/MoyasiGinko/godot-world-release/refs/heads/main/server_list.json",
+    "",
 )
 DEFAULT_UPDATE_RELEASE_API_URL = os.getenv(
     "DEFAULT_UPDATE_RELEASE_API_URL",
-    "https://api.github.com/repos/caelan-douglas/tinybox/releases/latest",
+    "",
 )
 DEFAULT_UPDATE_RELEASE_PAGE_URL = os.getenv(
     "DEFAULT_UPDATE_RELEASE_PAGE_URL",
-    "https://github.com/caelan-douglas/tinybox/releases/latest",
+    "",
 )
 
 
