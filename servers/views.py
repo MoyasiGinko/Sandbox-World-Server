@@ -13,6 +13,23 @@ def _get_or_create_capacity(server_id: str) -> GameServerRoomCapacity:
     return capacity
 
 
+def _coerce_non_negative_int(value, fallback: int = 0) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return max(parsed, 0)
+
+
+def _apply_reported_current_rooms(capacity: GameServerRoomCapacity, reported_value) -> None:
+    reported = _coerce_non_negative_int(reported_value, capacity.current_rooms)
+    # Keep current_rooms bounded by configured max_rooms to prevent invalid capacity state.
+    bounded = min(reported, max(capacity.max_rooms, 0))
+    if bounded != capacity.current_rooms:
+        capacity.current_rooms = bounded
+        capacity.save(update_fields=["current_rooms", "updated_at"])
+
+
 def _serialize_server(server: GameServer) -> dict:
     payload = server.to_public_dict()
     capacity = _get_or_create_capacity(server.server_id)
@@ -57,10 +74,7 @@ def game_servers_api(request: HttpRequest) -> HttpResponse:
 
         capacity = _get_or_create_capacity(server.server_id)
         if "current_rooms" in data:
-            capacity.current_rooms = int(
-                data.get("current_rooms", capacity.current_rooms) or capacity.current_rooms
-            )
-            capacity.save(update_fields=["current_rooms", "updated_at"])
+            _apply_reported_current_rooms(capacity, data.get("current_rooms", capacity.current_rooms))
 
         return JsonResponse({"success": True, "server": _serialize_server(server)})
     except (OperationalError, ProgrammingError):
@@ -95,10 +109,7 @@ def game_server_heartbeat_api(request: HttpRequest, server_id: str) -> HttpRespo
 
         capacity = _get_or_create_capacity(server.server_id)
         if "current_rooms" in data:
-            capacity.current_rooms = int(
-                data.get("current_rooms", capacity.current_rooms) or capacity.current_rooms
-            )
-            capacity.save(update_fields=["current_rooms", "updated_at"])
+            _apply_reported_current_rooms(capacity, data.get("current_rooms", capacity.current_rooms))
 
         return JsonResponse({"success": True, "server": _serialize_server(server)})
     except (OperationalError, ProgrammingError):
