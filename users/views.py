@@ -25,7 +25,10 @@ def _get_authenticated_user(request: HttpRequest) -> User | None:
     if decoded is None:
         return None
     user_id = int(decoded.get("userId", 0) or 0)
-    return User.objects.filter(id=user_id).first()
+    user = User.objects.filter(id=user_id).first()
+    if user is None and "username" in decoded:
+        user = User.objects.filter(username=decoded["username"]).first()
+    return user
 
 
 @csrf_exempt
@@ -218,7 +221,16 @@ def match_report_api(request: HttpRequest) -> HttpResponse:
     if not isinstance(players, list):
         return json_error("players must be an array", status=400)
 
-    now = timezone.now()
+    from django.utils.dateparse import parse_datetime
+    started_at_raw = data.get("started_at")
+    ended_at_raw = data.get("ended_at")
+
+    started_at = parse_datetime(started_at_raw) if started_at_raw else None
+    ended_at = parse_datetime(ended_at_raw) if ended_at_raw else timezone.now()
+
+    if not started_at and duration_seconds > 0:
+        started_at = ended_at - timezone.timedelta(seconds=duration_seconds)
+
     stats_snapshot: list[dict] = []
 
     with transaction.atomic():
@@ -226,7 +238,8 @@ def match_report_api(request: HttpRequest) -> HttpResponse:
             room_id=room_id,
             gamemode=gamemode,
             winner=winner_user,
-            ended_at=now,
+            started_at=started_at,
+            ended_at=ended_at,
             duration_seconds=duration_seconds,
             details={
                 "reported_by": reporter.id,
@@ -273,7 +286,7 @@ def match_report_api(request: HttpRequest) -> HttpResponse:
                 stats.wins += 1
             else:
                 stats.losses += 1
-            stats.last_match = now
+            stats.last_match = ended_at
             stats.save()
 
             snapshot_item = stats.to_public_dict()
