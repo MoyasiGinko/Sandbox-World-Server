@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('servers', '0001_create_room_capacity'),
+        ('worlds', '0004_delete_gameserver_delete_runtimeconfig'),
     ]
 
     operations = [

@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+        ('worlds', '0004_delete_gameserver_delete_runtimeconfig'),
     ]
 
     operations = [
