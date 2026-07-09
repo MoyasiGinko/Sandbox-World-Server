@@ -12,7 +12,7 @@ class RuntimeConfig(models.Model):
     class Meta:
         db_table = "worlds_runtimeconfig"
         ordering = ["key"]
-        managed = False
+        managed = True
 
     def __str__(self) -> str:
         return f"{self.key}={self.value}"

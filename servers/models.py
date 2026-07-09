@@ -21,7 +21,7 @@ class GameServer(models.Model):
     class Meta:
         db_table = "worlds_gameserver"
         ordering = ["name", "server_id"]
-        managed = False
+        managed = True
 
     def __str__(self) -> str:
         return f"{self.name} ({self.server_id})"
